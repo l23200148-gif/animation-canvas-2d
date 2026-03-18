@@ -1,100 +1,130 @@
 const canvas = document.getElementById("canvas");
 let ctx = canvas.getContext("2d");
 
-// Obtiene las dimensiones de la pantalla actual
-const window_height = window.innerHeight;
-const window_width = window.innerWidth;
+const inputWidth = document.getElementById("inputWidth");
+const inputHeight = document.getElementById("inputHeight");
+const btnResize = document.getElementById("btnResize");
+const effectSelect = document.getElementById("effectSelect");
+const btnLaunch = document.getElementById("btnLaunch");
 
-// El canvas tiene las mismas dimensiones que la pantalla
-canvas.height = window_height;
-canvas.width = window_width;
+// --- CONFIGURACIÓN FÍSICA ---
+const gravity = 0.8;      // Aceleración hacia abajo
+const friction = 0.7;     // Rebote (pierde 30% de energía al chocar)
+let arrayCircles = [];
 
-canvas.style.background = "#ff8";
+canvas.width = parseInt(inputWidth.value);
+canvas.height = parseInt(inputHeight.value);
+
+btnResize.addEventListener("click", () => {
+    canvas.width = parseInt(inputWidth.value);
+    canvas.height = parseInt(inputHeight.value);
+});
 
 class Circle {
-  constructor(x, y, radius, color, text, speed) {
-    this.posX = x;
-    this.posY = y;
-    this.radius = radius;
-    this.color = color;
-    this.text = text;
-
-    this.speed = speed;
-
-    this.dx = 1 * this.speed;
-    this.dy = 1 * this.speed;
-  }
-
-  draw(context) {
-    context.beginPath();
-
-    context.strokeStyle = this.color;
-    context.textAlign = "center";
-    context.textBaseline = "middle";
-    context.font = "20px Arial";
-    context.fillText(this.text, this.posX, this.posY);
-
-    context.lineWidth = 2;
-    context.arc(this.posX, this.posY, this.radius, 0, Math.PI * 2, false);
-    context.stroke();
-    context.closePath();
-  }
-
-  update(context) {
-    this.draw(context);
-
-    // --- REBOTE HORIZONTAL (Eje X) ---
-    // Si choca con el borde DERECHO
-    if (this.posX + this.radius >= window_width) {
-      this.posX = window_width - this.radius; // Lo empujamos justo al borde
-      this.dx = -this.dx; // Cambiamos dirección
-    }
-    // Si choca con el borde IZQUIERDO
-    if (this.posX - this.radius <= 0) {
-      this.posX = this.radius; // Lo empujamos justo al borde
-      this.dx = -this.dx;
+    constructor(x, y, radius, color, text, dx, dy) {
+        this.posX = x;
+        this.posY = y;
+        this.radius = radius;
+        this.color = color;
+        this.text = text;
+        this.dx = dx;
+        this.dy = dy;
     }
 
-    // --- REBOTE VERTICAL (Eje Y) ---
-    // Si choca con el borde INFERIOR (suelo)
-    if (this.posY + this.radius >= window_height) {
-      this.posY = window_height - this.radius; // Lo empujamos justo al borde
-      this.dy = -this.dy;
-    }
-    // Si choca con el borde SUPERIOR (techo)
-    if (this.posY - this.radius <= 0) {
-      this.posY = this.radius; // Lo empujamos justo al borde
-      this.dy = -this.dy;
+    draw(context) {
+        context.beginPath();
+        context.globalAlpha = 0.4; 
+        context.fillStyle = this.color;
+        context.arc(this.posX, this.posY, this.radius, 0, Math.PI * 2, false);
+        context.fill();
+
+        context.globalAlpha = 1.0; 
+        context.lineWidth = 2;
+        context.strokeStyle = "rgba(255, 255, 255, 0.8)";
+        context.stroke();
+        
+        context.fillStyle = "white";
+        context.textAlign = "center";
+        context.textBaseline = "middle";
+        context.font = "bold 14px Arial";
+        context.fillText(this.text, this.posX, this.posY);
+        context.closePath();
     }
 
-    // Finalmente, aplicamos el movimiento
-    this.posX += this.dx;
-    this.posY += this.dy;
-  }
+    update(context) {
+        // --- LÓGICA DE REBOTE Y GRAVEDAD ---
+
+        // Suelo
+        if (this.posY + this.radius + this.dy > canvas.height) {
+            this.dy = -this.dy * friction; // Invierte velocidad y aplica fricción
+            this.dx *= friction;           // El suelo frena el movimiento horizontal
+        } else {
+            this.dy += gravity;            // Aplica gravedad constante
+        }
+
+        // Paredes laterales
+        if (this.posX + this.radius + this.dx > canvas.width || this.posX - this.radius <= 0) {
+            this.dx = -this.dx * friction;
+        }
+
+        // Techo
+        if (this.posY - this.radius <= 0) {
+            this.dy = -this.dy * friction;
+        }
+
+        this.posX += this.dx;
+        this.posY += this.dy;
+        this.draw(context);
+    }
 }
 
-// --- CREACIÓN DEL CÍRCULO 1 ---
-let randomRadius1 = Math.floor(Math.random() * 100 + 30);
-let randomX1 = Math.random() * (window_width - 2 * randomRadius1) + randomRadius1;
-let randomY1 = Math.random() * (window_height - 2 * randomRadius1) + randomRadius1;
+function launch() {
+    arrayCircles = []; // Limpiamos la pantalla
+    const effect = effectSelect.value;
+    const num = 15; // Cantidad de pelotas
 
-let miCirculo = new Circle(randomX1, randomY1, randomRadius1, "blue", "Tec1", 5);
+    for (let i = 0; i < num; i++) {
+        let r = Math.floor(Math.random() * 20 + 15);
+        let color = `hsl(${Math.random() * 360}, 80%, 60%)`;
+        let x, y, dx, dy;
 
-// --- CREACIÓN DEL CÍRCULO 2 ---
-let randomRadius2 = Math.floor(Math.random() * 100 + 30);
-let randomX2 = Math.random() * (window_width - 2 * randomRadius2) + randomRadius2;
-let randomY2 = Math.random() * (window_height - 2 * randomRadius2) + randomRadius2;
+        // Definimos el punto de inicio y el impulso inicial según el selector
+        switch(effect) {
+            case 'top-left':
+                x = r; y = r;
+                dx = Math.random() * 15; dy = Math.random() * 5;
+                break;
+            case 'top-right':
+                x = canvas.width - r; y = r;
+                dx = -(Math.random() * 15); dy = Math.random() * 5;
+                break;
+            case 'bottom-left':
+                x = r; y = canvas.height - r;
+                dx = Math.random() * 12; dy = -(Math.random() * 25 + 10);
+                break;
+            case 'bottom-right':
+                x = canvas.width - r; y = canvas.height - r;
+                dx = -(Math.random() * 12); dy = -(Math.random() * 25 + 10);
+                break;
+            case 'top':
+                x = Math.random() * canvas.width; y = -r;
+                dx = (Math.random() - 0.5) * 10; dy = 5;
+                break;
+            case 'bottom':
+                x = Math.random() * canvas.width; y = canvas.height + r;
+                dx = (Math.random() - 0.5) * 10; dy = -(Math.random() * 30 + 15);
+                break;
+        }
+        arrayCircles.push(new Circle(x, y, r, color, i + 1, dx, dy));
+    }
+}
 
-let miCirculo2 = new Circle(randomX2, randomY2, randomRadius2, "red", "Tec2", 2);
+btnLaunch.addEventListener("click", launch);
 
-// --- BUCLE DE ANIMACIÓN ---
-let updateCircle = function () {
-  requestAnimationFrame(updateCircle);
-  ctx.clearRect(0, 0, window_width, window_height);
-  
-  miCirculo.update(ctx);
-  miCirculo2.update(ctx);
-};
+function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    arrayCircles.forEach(circle => circle.update(ctx));
+    requestAnimationFrame(animate);
+}
 
-// Iniciar la animación
-updateCircle();
+animate();
